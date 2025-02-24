@@ -11,7 +11,8 @@
 //    rax: сумма чисел
 //
 sum:
-    // your code here
+    movq %rdi, %rax
+    addq %rsi, %rax
     ret
 
 // input:
@@ -27,8 +28,22 @@ sum:
 //    в поле sum нужно записать сумму a и b
 //
 sum_struct:
-    // your code here
+    movq (%rdi), %rax
+    addq 8(%rdi), %rax
+    movq %rax, 16(%rdi)
     ret
+
+// rcx: индекс в массиве
+// rax: текущая сумма
+add_element:
+    addq (%rdi, %rcx, 8), %rax
+    incq %rcx
+
+for_loop:
+    cmpq %rcx, %rsi
+    jg add_element
+    ret
+
 
 // input:
 //    rdi: указатель на массив int64_t
@@ -38,7 +53,9 @@ sum_struct:
 //    rax: сумма элементов массива
 //
 sum_array:
-    // your code here
+    xorq %rax, %rax
+    xorq %rcx, %rcx
+    call for_loop
     ret
 
 // input:
@@ -47,6 +64,19 @@ sum_array:
 // output:
 //    rax: сумма элементов со стека
 //
+
+add_element2:
+    addq (%rsp, %rcx, 8), %rax
+    incq %rcx
+
+for_loop2:
+    cmpq %rcx, %rdi
+    jg add_element2
+    ret
+
 sum_args:
-    // your code here
+    movq $2, %rcx
+    addq $2, %rdi
+    xorq %rax, %rax
+    call for_loop2
     ret
