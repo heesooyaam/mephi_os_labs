@@ -4,7 +4,6 @@
 
 int main(int argc, char *argv[]) {
     struct rtcdate d;
-    char buf[64];
 
     if(date(&d) < 0) {
         exit();
