@@ -38,13 +38,12 @@ void sysgate() {
             : : : "rcx", "r11"
         );
 
-        write_msr(IA32_EFER, read_msr(IA32_EFER) | 1);
         long ret_val = 5;
-        if (syscall_num == 0) {
+        if (syscall_num == 1) {
             void *arg;
             __asm__ volatile("movq %%rsi, %0" : "=r"(arg));
             sys_work(arg);
-        } else if (syscall_num == 1) {
+        } else if (syscall_num == 2) {
             sys_retire();
         } else {
             ret_val = -1;
@@ -56,8 +55,7 @@ void sysgate() {
             "pop %%rcx\n\t"
             : : : "rcx", "r11"
         );
-        // write_msr(IA32_EFER, read_msr(IA32_EFER) & (~1));
-        asm volatile("sysretq\n\t");
+        __asm__ volatile("sysretq\n\t");
     } else {
         already_init = true;
         write_msr(IA32_EFER, read_msr(IA32_EFER) | 1);
@@ -66,7 +64,6 @@ void sysgate() {
         __asm__ volatile("pushfq; pop %0" : "=r"(user_rflags));
 
         write_msr(IA32_LSTAR, (long) sysgate);
-        // write_msr(IA32_EFER, read_msr(IA32_EFER) & (~1));
 
         __asm__ volatile(
             "movq %0, %%rcx\n\t"
