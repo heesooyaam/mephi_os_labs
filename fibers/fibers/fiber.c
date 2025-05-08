@@ -46,9 +46,22 @@ static void FiberTrampoline() {
 }
 
 static uint64_t PrepareStack(uint8_t* stack_top) {
-    *(uint64_t*)(stack_top - 8) = (uintptr_t) FiberTrampoline;
-    return (uint64_t) (stack_top - 8);
+    uintptr_t sp = (uintptr_t)stack_top;
+    sp &= ~0xF;
+
+    sp -= 8;              /* фиктивная ячейка */
+    *(uint64_t*)sp = 0;
+
+    sp -= 8;              /* return-адрес для ret */
+    *(uint64_t*)sp = (uint64_t)FiberTrampoline;
+
+    return (uint64_t)sp;
 }
+
+// static uint64_t PrepareStack(uint8_t* stack_top) {
+//     *(uint64_t*)(stack_top - 8) = (uintptr_t) FiberTrampoline;
+//     return (uint64_t) (stack_top - 8);
+// }
 
 void FiberSpawn(void (*f)(void*), void* args) {
     if (!f) {
@@ -95,7 +108,7 @@ void FiberYield() {
     FreeFinishedFibers();
 
     struct Fiber* from = CurrentFiber;
-    struct Fiber* to = CurrentFiber->next;
+    struct Fiber* to   = CurrentFiber->next;
 
     if (to == from) {
         return;
