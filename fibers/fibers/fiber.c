@@ -37,7 +37,6 @@ static void InitMainFiber() {
 }
 
 static void FiberTrampoline() {
-    struct Fiber* self = CurrentFiber;
     CurrentFiber->f(CurrentFiber->args);
     CurrentFiber->finished = 1;
     FiberYield();
