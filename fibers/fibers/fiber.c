@@ -45,22 +45,9 @@ static void FiberTrampoline() {
     assert(0);
 }
 
-// static uint64_t PrepareStack(uint8_t* stack_top) {
-//     uintptr_t sp = (uintptr_t)stack_top;
-//     sp &= ~0xF;
-//
-//     sp -= 8;              /* фиктивная ячейка */
-//     *(uint64_t*)sp = 0;
-//
-//     sp -= 8;              /* return-адрес для ret */
-//     *(uint64_t*)sp = (uint64_t)FiberTrampoline;
-//
-//     return (uint64_t)sp;
-// }
-
 static uint64_t PrepareStack(uint8_t* stack_top) {
     uintptr_t rsp = (uintptr_t) stack_top;
-    // rsp &= ~((1 << 4) - 1);
+    rsp &= ~((1 << 4) - 1);
     *(uint64_t*)(rsp - 16) = (uintptr_t) FiberTrampoline;
     return rsp - 16;
 }
