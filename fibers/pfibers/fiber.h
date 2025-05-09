@@ -1,5 +1,7 @@
 #pragma once
 
+#define _GNU_SOURCE
+
 // Инициализирует библиотеку
 // Функция должна быть вызвана до первгого вызова FiberSpawn
 void FiberInit();
