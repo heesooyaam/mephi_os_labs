@@ -60,9 +60,9 @@ static void FiberTrampoline() {
 
 static uint64_t PrepareStack(uint8_t* stack_top) {
     uintptr_t rsp = (uintptr_t) stack_top;
-    rsp &= ~((1 << 4) - 1);
-    *(uint64_t*)(rsp - 8) = (uintptr_t) FiberTrampoline;
-    return rsp - 8;
+    // rsp &= ~((1 << 4) - 1);
+    *(uint64_t*)(rsp - 16) = (uintptr_t) FiberTrampoline;
+    return rsp - 16;
 }
 
 void FiberSpawn(void (*f)(void*), void* args) {
