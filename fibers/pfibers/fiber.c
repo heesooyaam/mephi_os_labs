@@ -136,9 +136,8 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
     CurrentFiber = CurrentFiber->next;
     memcpy(uc->uc_mcontext.gregs, &(CurrentFiber->context), sizeof(struct Context));
     uint64_t *new_rsp = (uint64_t *)CurrentFiber->context.rsp;
-    uc->uc_mcontext.gregs[REG_RIP] = *new_rsp;
-    uc->uc_mcontext.gregs[REG_RSP] = (greg_t)(new_rsp + 1); // pop rip
-
+    ((struct Context*)uc->uc_mcontext.gregs)->rip = *new_rsp;
+    ((struct Context*)uc->uc_mcontext.gregs)->rsp = (greg_t)(new_rsp + 1); // pop rip
 }
 
 void FiberInit() {
