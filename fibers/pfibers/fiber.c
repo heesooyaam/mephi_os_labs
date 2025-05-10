@@ -136,7 +136,7 @@ static void fiber_sched(int sig, siginfo_t *si, void *uap) {
         return;
     }
     Current = to;
-    memcpy(uap, &Current->ctx, sizeof(ucontext_t));
+    setcontext(&to->ctx);
     // и незамедлительно переключаемся на новый
     // setcontext не возвращает
     abort();
