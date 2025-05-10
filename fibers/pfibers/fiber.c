@@ -1,155 +1,131 @@
+// fiber.c
+#define _GNU_SOURCE
 #include "fiber.h"
 
-#include <assert.h>
 #include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+#include <stdio.h>
 #include <unistd.h>
 
-#include <sys/ucontext.h>
+#define FIBER_STACK_SIZE (64*1024)
 
-#define FIBER_STACK_SIZE (64 << 10)
+static Fiber* Current = NULL;
 
-struct Context {
-    size_t r8, r9, r10, r11, r12, r13, r14, r15;
-    size_t rdi, rsi, rbp, rbx, rdx, rax, rcx, rsp;
-    size_t rip, flags;
-};
+// forward
+static void fiber_sched(int, siginfo_t*, void*);
+static void FiberTrampoline(void);
 
-struct Fiber {
-    struct Context context;
+// Инициализируем Main-файбер и регистрируем SIGALRM
+void FiberInit(void) {
+    if (Current) return;
+    setbuf(stdout, NULL);
 
-    struct Fiber* next;
-    void (*f)(void*);
-    void*    args;
-    uint8_t* stack;
-    int      finished;
-};
+    // создаём Main
+    Current = malloc(sizeof *Current);
+    memset(Current,0,sizeof *Current);
+    Current->stack = NULL;
+    Current->finished = 0;
+    Current->next = Current;
 
-extern void SwitchFiberContext(struct Context* from, struct Context* to);
-static struct Fiber* CurrentFiber = NULL;
+    // захватываем текущий контекст как стартовый
+    getcontext(&Current->ctx);
 
-static void InitMainFiber() {
-    if (CurrentFiber) {
-        return;
-    }
-
-    static struct Fiber Main = {0};
-    Main.next = &Main;
-    CurrentFiber = &Main;
-}
-
-static void FiberTrampoline() {
-    CurrentFiber->f(CurrentFiber->args);
-    CurrentFiber->finished = 1;
-    FiberYield();
-
-    // should never reach
-    assert(0);
-}
-
-static uint64_t PrepareStack(uint8_t* stack_top) {
-    uintptr_t rsp = (uintptr_t) stack_top;
-    rsp &= ~((1 << 4) - 1);
-    *(uint64_t*)(rsp - 16) = (uintptr_t) FiberTrampoline;
-    return rsp - 16;
+    // устанавливаем sigaction для вытеснения
+    struct sigaction sa = {0};
+    sa.sa_sigaction = fiber_sched;
+    sa.sa_flags     = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGALRM, &sa, NULL) < 0) { perror("sigaction"); exit(1); }
+    if (ualarm(1000, 1000) != 0)  { fprintf(stderr,"ualarm\n"); exit(1); }
 }
 
 void FiberSpawn(void (*f)(void*), void* args) {
-    if (!f) {
-        return;
-    }
+    assert(f);
+    FiberInit();
 
-    InitMainFiber();
+    Fiber* fbr = malloc(sizeof *fbr);
+    memset(fbr,0,sizeof *fbr);
+    fbr->f    = f;
+    fbr->args = args;
+    fbr->finished = 0;
+    fbr->stack = malloc(FIBER_STACK_SIZE);
 
-    struct Fiber* fiber = malloc(sizeof(struct Fiber));
-    fiber->f = f;
-    fiber->args = args;
-    fiber->finished = 0;
-    fiber->stack = malloc(FIBER_STACK_SIZE);
-    fiber->context.rsp = PrepareStack(fiber->stack + FIBER_STACK_SIZE);
-    fiber->next = CurrentFiber;
+    // подготовка контекста
+    getcontext(&fbr->ctx);
+    fbr->ctx.uc_stack.ss_sp   = fbr->stack;
+    fbr->ctx.uc_stack.ss_size = FIBER_STACK_SIZE;
+    fbr->ctx.uc_link          = NULL;    // при завершении — никуда
+    makecontext(&fbr->ctx, FiberTrampoline, 0);
 
-    struct Fiber* tail = CurrentFiber;
-    while (tail->next != CurrentFiber) {
-        tail = tail->next;
-    }
-    tail->next = fiber;
+    // вставка в кольцо
+    Fiber* tail = Current;
+    while (tail->next != Current) tail = tail->next;
+    tail->next = fbr;
+    fbr->next  = Current;
 }
 
-static void FreeFinishedFibers() {
-    struct Fiber* prev = CurrentFiber;
-    struct Fiber* cur = prev->next;
-
-    while (cur != CurrentFiber) {
+static void FreeFinished(void) {
+    Fiber* prev = Current;
+    Fiber* cur  = prev->next;
+    while (cur != Current) {
         if (cur->finished) {
             prev->next = cur->next;
             free(cur->stack);
             free(cur);
-
             cur = prev->next;
         } else {
             prev = cur;
-            cur = cur->next;
+            cur  = cur->next;
         }
     }
 }
 
-void FiberYield() {
-    InitMainFiber();
-    FreeFinishedFibers();
+void FiberYield(void) {
+    FiberInit();
+    FreeFinished();
 
-    struct Fiber* from = CurrentFiber;
-    struct Fiber* to   = CurrentFiber->next;
+    Fiber* next = Current->next;
+    if (next == Current) return;
+    Fiber* from = Current;
+    Current = next;
+    // поменяем контексты
+    swapcontext(&from->ctx, &next->ctx);
+}
 
-    if (to == from) {
+int FiberTryJoin(void) {
+    FiberInit();
+    FreeFinished();
+    return Current->next == Current;
+}
+
+// точка входа для любого нового файбера
+static void FiberTrampoline(void) {
+    Fiber* self = Current;
+    self->f(self->args);
+    self->finished = 1;
+    // не возвращаемся никогда сюда
+    FiberYield();
+    abort();
+}
+
+// вытесняющий шедулер
+static void fiber_sched(int sig, siginfo_t *si, void *uap) {
+    ucontext_t *uc = (ucontext_t*)uap;
+
+    // Сохраняем весь текущий контекст в Current->ctx
+    Current->ctx = *uc;
+
+    FreeFinished();
+    Fiber* to = Current->next;
+    if (to == Current) {
+        // нет другого — остаёмся
         return;
     }
-
-    CurrentFiber = to;
-    SwitchFiberContext(&(from->context), &(to->context));
-}
-
-int FiberTryJoin() {
-    InitMainFiber();
-    FreeFinishedFibers();
-    return CurrentFiber->next == CurrentFiber;
-}
-
-void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
-    // если один файбер, то ничего делать не надо, продолжаем в том же духе
-    if (CurrentFiber->next == CurrentFiber) {
-        return;
-    }
-
-    ucontext_t *uc = (ucontext_t *)ucontext;
-
-    // кладем rip на стек, поддерживая инвариант
-    memcpy(&CurrentFiber->context, uc->uc_mcontext.gregs, sizeof(struct Context));
-    uint64_t *rsp = (uint64_t *)CurrentFiber->context.rsp - 1;
-    *rsp = CurrentFiber->context.rip;
-    CurrentFiber->context.rsp = (size_t) rsp;
-
-    // меняем контекст
-    CurrentFiber = CurrentFiber->next;
-    memcpy(uc->uc_mcontext.gregs, &(CurrentFiber->context), sizeof(struct Context));
-    uint64_t *new_rsp = (uint64_t *)CurrentFiber->context.rsp;
-    ((struct Context*)uc->uc_mcontext.gregs)->rip = *new_rsp;
-    ((struct Context*)uc->uc_mcontext.gregs)->rsp = (greg_t)(new_rsp + 1); // pop rip
-}
-
-void FiberInit() {
-    // Need to disable stdlib buffer to use printf from fibers
-    setbuf(stdout, NULL);
-
-    // Initialize timer
-    struct sigaction sa = {0};
-    sa.sa_sigaction = fiber_sched;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-
-    sigaction(SIGALRM, &sa, NULL);
-    ualarm(1000, 1000);
+    Current = to;
+    memcpy(uap, &Current->ctx, sizeof(ucontext_t));
+    // и незамедлительно переключаемся на новый
+    // setcontext не возвращает
+    abort();
 }
