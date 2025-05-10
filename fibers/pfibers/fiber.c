@@ -108,8 +108,8 @@ void FiberYield() {
         return;
     }
 
-    raise(SIGALRM);
     CurrentFiber = to;
+    raise(SIGALRM);
     SwitchFiberContext(&(from->context), &(to->context));
 }
 
