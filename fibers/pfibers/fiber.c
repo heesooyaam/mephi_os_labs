@@ -8,6 +8,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <ucontext.h>
+
+#include <stdint.h>
 
 #define FIBER_STACK_SIZE (64*1024)
 
