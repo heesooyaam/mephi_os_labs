@@ -11,6 +11,15 @@
 
 #define FIBER_STACK_SIZE (64*1024)
 
+typedef struct Fiber {
+    ucontext_t      ctx;            // полный контекст
+    struct Fiber*   next;
+    void          (*f)(void*);
+    void*           args;
+    uint8_t*        stack;
+    int             finished;
+} Fiber;
+
 static Fiber* Current = NULL;
 
 // forward
