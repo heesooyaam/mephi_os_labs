@@ -101,15 +101,7 @@ void FiberYield() {
     InitMainFiber();
     FreeFinishedFibers();
 
-    struct Fiber* from = CurrentFiber;
-    struct Fiber* to   = CurrentFiber->next;
-
-    if (to == from) {
-        return;
-    }
-
-    CurrentFiber = to;
-    SwitchFiberContext(&(from->context), &(to->context));
+    raise(SIGALRM);
 }
 
 int FiberTryJoin() {
