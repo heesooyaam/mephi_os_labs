@@ -38,12 +38,15 @@ static void InitMainFiber() {
 
     static struct Fiber Main = {0};
     Main.next = &Main;
+    Main.f = NULL;
     CurrentFiber = &Main;
 }
 
 static void FiberTrampoline() {
-    CurrentFiber->f(CurrentFiber->args);
-    CurrentFiber->finished = 1;
+    if (CurrentFiber->f) {
+        CurrentFiber->f(CurrentFiber->args);
+        CurrentFiber->finished = 1;
+    }
     FiberYield();
 
     // should never reach
@@ -109,7 +112,6 @@ void FiberYield() {
     }
 
     CurrentFiber = to;
-    raise(SIGALRM);
     SwitchFiberContext(&(from->context), &(to->context));
 }
 
