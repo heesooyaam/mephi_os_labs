@@ -125,6 +125,8 @@ trap(struct trapframe *tf)
       }
     }
 
+    cprintf("proc %d tick %d handler %p in_hdl %d\n",
+        p->pid, p->alarm_ticks, p->alarm_handler, p->alarm_in_handler);
     yield();
    }
 
