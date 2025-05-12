@@ -1,3 +1,4 @@
+#pragma once
 #include "x86.h"
 // Per-CPU state
 struct cpu {
