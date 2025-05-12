@@ -54,6 +54,7 @@ struct proc {
   int  alarm_ticks;
   void (*alarm_handler)(void);
   int  alarm_in_handler;
+  struct trapframe alarm_tf;
 };
 
 // Process memory is laid out contiguously, low addresses first:
