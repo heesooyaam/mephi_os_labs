@@ -135,7 +135,7 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
     FiberYield();
     // кладем rip на стек, поддерживая инвариант
     memcpy(&CurrentFiber->context, uc->uc_mcontext.gregs, sizeof(struct Context));
-    uint64_t *rsp = (uint64_t *)CurrentFiber->context.rsp - 1;
+    // uint64_t *rsp = (uint64_t *)CurrentFiber->context.rsp - 1;
     *rsp = CurrentFiber->context.rip;
     CurrentFiber->context.rsp = (size_t) rsp;
 
