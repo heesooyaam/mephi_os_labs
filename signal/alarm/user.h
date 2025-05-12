@@ -37,3 +37,5 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+int alarm(int ticks, void (*handler)(void));
+int sigret(void);

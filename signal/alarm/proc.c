@@ -78,6 +78,7 @@ allocproc(void)
 
   acquire(&ptable.lock);
 
+  // Ищем свободный слот
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == UNUSED)
       goto found;
@@ -85,25 +86,30 @@ allocproc(void)
   release(&ptable.lock);
   return 0;
 
-found:
-  p->state = EMBRYO;
-  p->pid = nextpid++;
-
+  found:
+    p->state = EMBRYO;
+  p->pid   = nextpid++;
   release(&ptable.lock);
 
-  // Allocate kernel stack.
+  // Выделяем kernel stack
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
 
-  // Leave room for trap frame.
+  // Оставляем место под trap frame
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
 
-  // Set up new context to start executing at forkret,
-  // which returns to trapret.
+  // === Инициализация полей для alarm ===
+  p->alarm_interval   = 0;
+  p->alarm_ticks      = 0;
+  p->alarm_handler    = 0;
+  p->alarm_in_handler = 0;
+  // =====================================
+
+  // Настраиваем контекст для forkret -> trapret
   sp -= 4;
   *(uint*)sp = (uint)trapret;
 
@@ -199,6 +205,11 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
+
+  np->alarm_interval   = 0;
+  np->alarm_ticks      = 0;
+  np->alarm_handler    = 0;
+  np->alarm_in_handler = 0;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
