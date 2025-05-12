@@ -107,6 +107,12 @@ allocproc(void)
   p->alarm_ticks      = 0;
   p->alarm_handler    = 0;
   p->alarm_in_handler = 0;
+  if ((p->alarm_tf = (struct trapframe*)kalloc()) == 0){
+    kfree(p->kstack);
+    p->kstack = 0;
+    p->state  = UNUSED;
+    return 0;
+  }
   // =====================================
 
   // Настраиваем контекст для forkret -> trapret
@@ -210,6 +216,12 @@ fork(void)
   np->alarm_ticks      = 0;
   np->alarm_handler    = 0;
   np->alarm_in_handler = 0;
+  if ((np->alarm_tf = (struct trapframe*)kalloc()) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state  = UNUSED;
+    return -1;
+  }
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -305,6 +317,10 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        if (p->alarm_tf){
+          kfree((char*)p->alarm_tf);
+          p->alarm_tf = 0;
+        }
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;

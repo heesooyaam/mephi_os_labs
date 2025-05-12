@@ -1,5 +1,3 @@
-#pragma once
-#include "x86.h"
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -56,7 +54,7 @@ struct proc {
   int  alarm_ticks;
   void (*alarm_handler)(void);
   int  alarm_in_handler;
-  struct trapframe alarm_tf;
+  struct trapframe *alarm_tf;
 };
 
 // Process memory is laid out contiguously, low addresses first:

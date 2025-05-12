@@ -40,12 +40,12 @@ trap(struct trapframe *tf)
 
   if (p && p->alarm_in_handler) {
     if ( (tf->cs & 3) == DPL_USER &&
-         tf->eip != (uint)p->alarm_handler ) {
-      *tf = p->alarm_tf;
+         tf->eip != (uint)p->alarm_handler )
+    {
+      *tf = *p->alarm_tf;
       p->alarm_in_handler = 0;
     }
   }
-
   if (tf->trapno == T_SYSCALL) {
     if (p && p->killed)
       exit();
@@ -56,9 +56,10 @@ trap(struct trapframe *tf)
     return;
   }
 
-  switch(tf->trapno){
+  switch (tf->trapno) {
+
   case T_IRQ0 + IRQ_TIMER:
-    if (cpuid() == 0){
+    if (cpuid() == 0) {
       acquire(&tickslock);
       ticks++;
       wakeup(&ticks);
@@ -74,10 +75,10 @@ trap(struct trapframe *tf)
         p->alarm_ticks = 0;
         p->alarm_in_handler = 1;
 
-        p->alarm_tf = *tf;
+        *p->alarm_tf = *tf;
 
         tf->esp -= 4;
-        *(uint*)tf->esp = p->alarm_tf.eip;
+        *(uint*)tf->esp = p->alarm_tf->eip;
 
         tf->eip = (uint)p->alarm_handler;
       }
@@ -112,7 +113,7 @@ trap(struct trapframe *tf)
     break;
 
   default:
-    if (p == 0 || (tf->cs & 3) == 0){
+    if (p == 0 || (tf->cs & 3) == 0) {
       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
               tf->trapno, cpuid(), tf->eip, rcr2());
       panic("trap");
