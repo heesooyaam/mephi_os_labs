@@ -43,10 +43,9 @@ static void InitMainFiber() {
 }
 
 static void FiberTrampoline() {
-    if (CurrentFiber->f) {
-        CurrentFiber->f(CurrentFiber->args);
-        CurrentFiber->finished = 1;
-    }
+    CurrentFiber->f(CurrentFiber->args);
+    CurrentFiber->finished = 1;
+
     FiberYield();
 
     // should never reach
@@ -126,6 +125,8 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
     if (CurrentFiber->next == CurrentFiber) {
         return;
     }
+
+    FiberYield();
 
     ucontext_t *uc = (ucontext_t *)ucontext;
 
