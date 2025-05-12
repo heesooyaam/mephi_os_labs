@@ -91,14 +91,6 @@ sys_uptime(void)
 }
 
 int
-sys_sigret(void)
-{
-  struct proc *p = myproc();
-  p->alarm_in_handler = 0;
-  return 0;
-}
-
-int
 sys_alarm(void)
 {
   int n;
