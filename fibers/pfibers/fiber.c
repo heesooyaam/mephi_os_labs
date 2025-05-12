@@ -126,7 +126,6 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
         return;
     }
 
-    FiberYield();
     ucontext_t *uc = (ucontext_t *)ucontext;
     // кладем rip на стек, поддерживая инвариант
     memcpy(&CurrentFiber->context, uc->uc_mcontext.gregs, sizeof(struct Context));
@@ -150,9 +149,8 @@ void FiberInit() {
     struct sigaction sa = {0};
     sa.sa_sigaction = fiber_sched;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+    sa.sa_flags = SA_SIGINFO;
 
     sigaction(SIGALRM, &sa, NULL);
     ualarm(1000, 1000);
-
 }
