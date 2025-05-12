@@ -57,17 +57,32 @@ trap(struct trapframe *tf)
 
     struct proc *p = myproc();
     if(p && p->state == RUNNING){
+      int usermode = (tf->cs & 3) == DPL_USER;
 
       if(p->alarm_in_handler &&
-         (tf->cs & 3) == DPL_USER && p->alarm_tf &&
-         tf->esp == p->alarm_tf->esp){
-        p->alarm_in_handler = 0;
-         }
-      if(!p->alarm_in_handler && p->alarm_interval > 0){
-        p->alarm_ticks++;
+         usermode &&
+         p->alarm_tf &&
+         tf->esp == p->alarm_tf->esp
+        ){
 
-        if(p->alarm_ticks >= p->alarm_interval &&
-           (tf->cs & 3) == DPL_USER){
+        tf->eax = p->alarm_tf->eax;
+        tf->ebx = p->alarm_tf->ebx;
+        tf->ecx = p->alarm_tf->ecx;
+        tf->edx = p->alarm_tf->edx;
+        tf->esi = p->alarm_tf->esi;
+        tf->edi = p->alarm_tf->edi;
+        tf->ebp = p->alarm_tf->ebp;
+        tf->ds  = p->alarm_tf->ds;
+        tf->es  = p->alarm_tf->es;
+        tf->fs  = p->alarm_tf->fs;
+        tf->gs  = p->alarm_tf->gs;
+
+        p->alarm_in_handler = 0;
+        }
+
+      if(usermode && !p->alarm_in_handler && p->alarm_interval > 0){
+        p->alarm_ticks++;
+        if(p->alarm_ticks >= p->alarm_interval){
           p->alarm_ticks = 0;
 
           if(p->alarm_tf == 0)
@@ -78,7 +93,7 @@ trap(struct trapframe *tf)
             p->tf->esp -= 4;
             *(uint*)p->tf->esp = p->alarm_tf->eip;
 
-            p->tf->eip        = (uint)p->alarm_handler;
+            p->tf->eip         = (uint)p->alarm_handler;
             p->alarm_in_handler = 1;
           }
         }
