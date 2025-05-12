@@ -78,7 +78,6 @@ allocproc(void)
 
   acquire(&ptable.lock);
 
-  // Ищем свободный слот
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == UNUSED)
       goto found;
@@ -86,36 +85,31 @@ allocproc(void)
   release(&ptable.lock);
   return 0;
 
-  found:
-    p->state = EMBRYO;
-  p->pid   = nextpid++;
+found:
+  p->state = EMBRYO;
+  p->pid = nextpid++;
+
+  p->alarm_interval   = 0;
+  p->alarm_ticks      = 0;
+  p->alarm_handler    = 0;
+  p->alarm_in_handler = 0;
+  p->alarm_tf         = 0;
+
   release(&ptable.lock);
 
-  // Выделяем kernel stack
+  // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
 
-  // Оставляем место под trap frame
+  // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
 
-  // === Инициализация полей для alarm ===
-  p->alarm_interval   = 0;
-  p->alarm_ticks      = 0;
-  p->alarm_handler    = 0;
-  p->alarm_in_handler = 0;
-  if ((p->alarm_tf = (struct trapframe*)kalloc()) == 0){
-    kfree(p->kstack);
-    p->kstack = 0;
-    p->state  = UNUSED;
-    return 0;
-  }
-  // =====================================
-
-  // Настраиваем контекст для forkret -> trapret
+  // Set up new context to start executing at forkret,
+  // which returns to trapret.
   sp -= 4;
   *(uint*)sp = (uint)trapret;
 
@@ -136,7 +130,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  
+
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -212,19 +206,14 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
   np->alarm_interval   = 0;
   np->alarm_ticks      = 0;
   np->alarm_handler    = 0;
   np->alarm_in_handler = 0;
-  if ((np->alarm_tf = (struct trapframe*)kalloc()) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state  = UNUSED;
-    return -1;
-  }
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
+  np->alarm_tf         = 0;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -234,6 +223,7 @@ fork(void)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+
 
   acquire(&ptable.lock);
 
@@ -256,6 +246,9 @@ exit(void)
 
   if(curproc == initproc)
     panic("init exiting");
+
+  if(curproc->alarm_tf)
+    kfree((char*)curproc->alarm_tf);
 
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
@@ -298,7 +291,7 @@ wait(void)
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
-  
+
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
@@ -317,10 +310,6 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        if (p->alarm_tf){
-          kfree((char*)p->alarm_tf);
-          p->alarm_tf = 0;
-        }
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
