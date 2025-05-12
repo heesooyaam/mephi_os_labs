@@ -54,6 +54,32 @@ trap(struct trapframe *tf)
       wakeup(&ticks);
       release(&tickslock);
     }
+
+    struct proc *p = myproc();
+    if(p && p->state == RUNNING && (tf->cs & 3) == DPL_USER){
+      if(p->alarm_in_handler && tf->eip != (uint)p->alarm_handler)
+        p->alarm_in_handler = 0;
+
+      if(!p->alarm_in_handler && p->alarm_interval){
+        p->alarm_ticks++;
+        if(p->alarm_ticks >= p->alarm_interval){
+          p->alarm_ticks = 0;
+
+          if(p->alarm_tf == 0)
+            p->alarm_tf = (struct trapframe*)kalloc();
+          if(p->alarm_tf){
+            memmove(p->alarm_tf, p->tf, sizeof(struct trapframe));
+
+            p->tf->esp -= 4;
+            *(uint*)p->tf->esp = p->alarm_tf->eip;
+
+            p->tf->eip        = (uint)p->alarm_handler;
+            p->alarm_in_handler = 1;
+          }
+        }
+      }
+    }
+
     lapiceoi();
     break;
   case T_IRQ0 + IRQ_IDE:
