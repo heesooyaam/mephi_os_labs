@@ -126,7 +126,6 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
         return;
     }
 
-    FiberYield();
 
     ucontext_t *uc = (ucontext_t *)ucontext;
 
@@ -135,6 +134,7 @@ void fiber_sched(int signum, siginfo_t *si, void *ucontext) {
     uint64_t *rsp = (uint64_t *)CurrentFiber->context.rsp - 1;
     *rsp = CurrentFiber->context.rip;
     CurrentFiber->context.rsp = (size_t) rsp;
+    FiberYield();
 
     // меняем контекст
     CurrentFiber = CurrentFiber->next;
