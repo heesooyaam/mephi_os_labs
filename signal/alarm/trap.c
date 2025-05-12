@@ -58,8 +58,8 @@ trap(struct trapframe *tf)
     struct proc *p = myproc();
     if(p && p->state == RUNNING && (tf->cs & 3) == DPL_USER){
       if(p->alarm_in_handler &&
-         p->alarm_tf && tf->eip == p->alarm_tf->eip){
-        p->alarm_in_handler = 0;
+         p->alarm_tf && tf->esp == p->alarm_tf->esp){
+         p->alarm_in_handler = 0;
          }
 
       if(!p->alarm_in_handler && p->alarm_interval > 0){
