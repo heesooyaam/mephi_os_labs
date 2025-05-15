@@ -1,3 +1,6 @@
+#define _GNU_SOURCE
+#define __GLIBC_USE
+
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
