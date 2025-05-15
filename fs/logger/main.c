@@ -49,11 +49,11 @@ int main(int argc, char** argv) {
 
     char buff[BUFF_SIZE];
     for (;;) {
-        if (!fgets(buff, sizeof(buff) - 1, stdin)) {
-            if (errno == EINTR) {
-                continue;
-            } else if (feof(stdin)){
+        if (!fgets(buff, sizeof(buff), stdin)) {
+            if (feof(stdin)) {
                 break;
+            } else if (errno == EINTR){
+                continue;
             } else {
                 return 1;
             }
